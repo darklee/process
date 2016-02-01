@@ -1,12 +1,19 @@
 import io
 import json
 import logging
+import os
+import service
 
 import psutil
 from bottle import template, Bottle, response, JSONPlugin, request
 
+logging.basicConfig(level=logging.INFO)
+
+FILE_SERVICES = "services.json"
+FILE_SETTINGS = "settings.json"
+
 app = Bottle()
-settings = json.load(io.open("settings.json", encoding="UTF-8"))
+settings = json.load(io.open(FILE_SETTINGS, encoding="UTF-8"))
 
 
 def before_request():
@@ -33,46 +40,14 @@ def processes():
             pass
         else:
             infos.append(pinfo)
-    if "tree" in request.params or "map" in request.params:
+    if "map" in request.params:
         pmap = {}
         for info in infos:
             pid = info["pid"]
-            ppid = info["ppid"]
-            pp = pmap.get(ppid, {
-                "subprocesses": []
-            })
-            p = pmap.get(pid, {
-                "subprocesses": []
-            })
-            pmap[ppid] = pp
-            pmap[pid] = p
-            p.update(info)
-            if ppid == pid:
-                del p["ppid"]
-            subprocesses = pp["subprocesses"]
-            subprocesses.append(pid)
-        if "map" in request.params:
-            return {
-                "data": pmap
-            }
-        else:
-            roots = []
-
-            def process_sub(p):
-                subs = p["subprocesses"]
-                for x in range(0, len(subs)):
-                    sub = pmap[subs[x]]
-                    subs[x] = pmap[subs[x]]
-                    process_sub(sub)
-
-            for k in pmap:
-                p = pmap[k]
-                if "ppid" not in p:
-                    roots.append(p)
-                process_sub(p)
-            return {
-                "data": pmap
-            }
+            pmap[pid] = info
+        return {
+            "data": pmap
+        }
     else:
         return {
             "data": infos
@@ -84,16 +59,17 @@ def config():
     return settings
 
 
-logging.basicConfig(level=logging.INFO)
-
-
-def do_auto_start():
-    logging.info("Autostarting")
-    for pdef in settings["process"]["list"]:
-        autostart = pdef.get("autostart", settings["process"].get("autostart", False))
-        if autostart:
-            logging.info("Autostart: id=%s, cmd=%s" % (pdef["id"], pdef["cmd"]))
-            psutil.Popen(pdef["cmd"])
+def do_auto_start_services():
+    autostart = settings["services"].get("autostart", False)
+    logging.info("Starting services, autostart=%s" % autostart)
+    service_map = {}
+    for conf in settings["services"]["list"]:
+        srv = service.Service(conf)
+        service_map[conf["id"]] = srv
+    if autostart:
+        for key in service_map:
+            srv = service_map[key]
+            srv.autostart()
 
 
 class JsonPlugin(JSONPlugin):
@@ -102,9 +78,10 @@ class JsonPlugin(JSONPlugin):
             return json.dumps(*args, ensure_ascii=False)
 
         self.json_dumps = json_dumps
+        super(JsonPlugin, self).__init__()
 
 
-do_auto_start()
+do_auto_start_services()
 app.config['autojson'] = False
 app.add_hook("before_request", before_request)
 app.add_hook("after_request", after_request)
