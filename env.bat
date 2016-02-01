@@ -1,0 +1,1 @@
+@call C:\Users\10071868\Envs\Test\Scripts\activate

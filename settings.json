@@ -1,0 +1,12 @@
+{
+  "process": {
+    "autostart": true,
+    "list": [
+      {
+        "id": "proc-1",
+        "name": "Notepad",
+        "cmd": "Notepad.exe"
+      }
+    ]
+  }
+}
