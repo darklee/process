@@ -1,19 +1,19 @@
 import io
 import json
 import logging
-import os
-import service
 
 import psutil
 from bottle import template, Bottle, response, JSONPlugin, request
 
+import core
+
 logging.basicConfig(level=logging.INFO)
 
-FILE_SERVICES = "services.json"
 FILE_SETTINGS = "settings.json"
 
-app = Bottle()
 settings = json.load(io.open(FILE_SETTINGS, encoding="UTF-8"))
+console = core.Console(settings)
+app = Bottle()
 
 
 def before_request():
@@ -26,12 +26,52 @@ def after_request():
 
 
 @app.route('/hello/<name>')
-def index(name):
+def get_index(name):
     return template('<b>Hello {{name}}</b>!', name=name)
 
 
+@app.route('/services')
+def get_services():
+    data = []
+    services = console.get_services()
+    for k in services:
+        data.append(get_service_by_id(services[k].id)["data"])
+    return {
+        "data": data
+    }
+
+
+@app.route('/services/<service_id>')
+def get_service_by_id(service_id):
+    svr = console.get_service(service_id)
+    if svr:
+        data = {}
+        data.update(svr.options)
+        data["running"] = svr.running
+        process_list = data["processes"] = []
+        for proc in svr.process_list:
+            process_list.append({
+                "pid": proc.pid
+            })
+        return {
+            "data": data
+        }
+    else:
+        return None
+
+
+@app.route('/action/service/<name>')
+def do_service_action(name):
+    service_id = request.params.get("id")
+    svr = console.get_service(service_id)
+    if svr:
+        method = getattr(svr, name)
+        if method:
+            method()
+
+
 @app.route('/processes')
-def processes():
+def get_processes():
     infos = []
     for proc in psutil.process_iter():
         try:
@@ -55,21 +95,15 @@ def processes():
 
 
 @app.get("/config")
-def config():
+def get_config():
     return settings
 
 
 def do_auto_start_services():
     autostart = settings["services"].get("autostart", False)
-    logging.info("Starting services, autostart=%s" % autostart)
-    service_map = {}
-    for conf in settings["services"]["list"]:
-        srv = service.Service(conf)
-        service_map[conf["id"]] = srv
+    logging.info("Autostart=%s" % autostart)
     if autostart:
-        for key in service_map:
-            srv = service_map[key]
-            srv.autostart()
+        console.start()
 
 
 class JsonPlugin(JSONPlugin):

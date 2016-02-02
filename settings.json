@@ -6,6 +6,11 @@
         "id": "proc-1",
         "name": "Notepad",
         "cmd": "Notepad.exe"
+      },
+      {
+        "id": "proc-2",
+        "name": "Notepad",
+        "cmd": "Notepad.exe"
       }
     ]
   }
