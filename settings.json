@@ -5,7 +5,33 @@
       {
         "id": "proc-1",
         "name": "Notepad",
-        "cmd": "Notepad.exe"
+        "cmd": "Notepad.exe",
+        "control": {
+          "depends": [
+            "proc-2"
+          ],
+          "state": {
+            "started": [
+              "check_port",
+              "wait_10s"
+            ],
+            "stopped": []
+          },
+          "condition": [
+            {
+              "id": "check_port",
+              "type": "port_list",
+              "port_list": [
+                8080
+              ]
+            },
+            {
+              "id": "wait_10s",
+              "type": "time_wait",
+              "seconds": 10
+            }
+          ]
+        }
       },
       {
         "id": "proc-2",
