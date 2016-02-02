@@ -115,9 +115,10 @@ class JsonPlugin(JSONPlugin):
         super(JsonPlugin, self).__init__()
 
 
-do_auto_start_services()
-app.config['autojson'] = False
-app.add_hook("before_request", before_request)
-app.add_hook("after_request", after_request)
-app.install(JsonPlugin())
-app.run(host='0.0.0.0', port=8080)
+if __name__ == "__main__":
+    do_auto_start_services()
+    app.config['autojson'] = False
+    app.add_hook("before_request", before_request)
+    app.add_hook("after_request", after_request)
+    app.install(JsonPlugin())
+    app.run(host='0.0.0.0', port=8080)
