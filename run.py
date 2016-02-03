@@ -35,7 +35,7 @@ def get_services():
     data = []
     services = console.get_services()
     for k in services:
-        data.append(get_service_by_id(services[k].id)["data"])
+        data.append(dict(services[k].values_map))
     return {
         "data": data
     }
@@ -45,16 +45,8 @@ def get_services():
 def get_service_by_id(service_id):
     svr = console.get_service(service_id)
     if svr:
-        data = {}
-        data.update(svr.options)
-        data["running"] = svr.running
-        process_list = data["processes"] = []
-        for proc in svr.process_list:
-            process_list.append({
-                "pid": proc.pid
-            })
         return {
-            "data": data
+            "data": dict(svr.values_map)
         }
     else:
         return None

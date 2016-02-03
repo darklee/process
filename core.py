@@ -5,8 +5,54 @@ import os
 import sched
 import threading
 import time
+from collections import MutableMapping
 
 import psutil
+
+
+class ValuesMap(MutableMapping):
+    def puts(self, obj, attrs=lambda x: True):
+        is_dict = isinstance(obj, dict)
+        iterable = obj if is_dict else dir(obj)
+        for name in iterable:
+            accpet = False
+            if callable(attrs):
+                if attrs(name):
+                    accpet = True
+            elif name in attrs:
+                accpet = True
+            if accpet:
+                def create_get_value(attr):
+                    def get_value():
+                        value = obj[attr] if is_dict else getattr(obj, attr)
+                        return value if not callable(value) else value()
+
+                    return get_value
+
+                d_value = create_get_value(name)
+                self._dict[name] = d_value
+
+    def __init__(self):
+        self._dict = {}
+
+    def __iter__(self):
+        return self._dict.__iter__()
+
+    def __getitem__(self, key):
+        value = self._dict[key]
+        if callable(value):
+            return value()
+        else:
+            return value
+
+    def __setitem__(self, key, value):
+        self._dict[key] = value
+
+    def __delitem__(self, key):
+        del self._dict[key]
+
+    def __len__(self):
+        return len(self._dict)
 
 
 class Service:
@@ -20,16 +66,25 @@ class Service:
         self.pid_file = "runtime/{0}.pid".format(options["id"])
         self.process_list = []
         self.running = False
+        self.values_map = ValuesMap()
+        self.values_map.puts(options, lambda name: name not in ["control"])
+        self.values_map.puts(self, ["id", "running"])
+        self.values_map.puts({
+            "processes": lambda: list(map(lambda p: p.pid, self.process_list))
+        })
         if os.path.exists(self.pid_file):
             pid_list = list(json.load(io.open(self.pid_file, encoding="UTF-8")))
             self.logger.info("Loading pid: %s", pid_list)
             for pid in pid_list:
                 if psutil.pid_exists(pid):
-                    proc = psutil.Process(pid)
-                    if proc.cmdline() == self.options["cmd"]:
-                        self.logger.info("Found running process: %s", pid)
-                        self.process_list.append(proc)
-                        self.running = True
+                    try:
+                        proc = psutil.Process(pid)
+                        if proc.cmdline() == self.options["cmd"]:
+                            self.logger.info("Found running process: %s", pid)
+                            self.process_list.append(proc)
+                            self.running = True
+                    except psutil.NoSuchProcess:
+                        pass
                 if not self.running:
                     self.logger.info("Process is not running: %s", pid)
 
